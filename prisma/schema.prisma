@@ -1,0 +1,58 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum TransactionStatus {
+  SUCCESS
+  FAILED
+}
+
+model User {
+  id          String     @id @default(uuid())
+  username    String     @unique
+  status      UserStatus @default(ACTIVE)
+  firstName   String     @map("first_name")
+  middleName  String     @map("middle_name")
+  lastName    String     @map("last_name")
+  email       String     @unique
+  phoneNumber String     @unique @map("phone_number")
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+
+  transactionsAsSender    Transaction[] @relation("TransactionsAsSender")
+  transactionsAsRecipient Transaction[] @relation("TransactionsAsRecipient")
+
+  @@map("users")
+}
+
+model Transaction {
+  id            String            @id @default(uuid())
+  senderId      String            @map("sender_id")
+  recipientId   String            @map("receiver_id")
+  amount        Decimal           @db.Decimal(6, 2)
+  status        TransactionStatus @default(SUCCESS)
+  failureReason String?           @map("failure_reason")
+  createdAt     DateTime          @default(now()) @map("created_at")
+  updatedAt     DateTime          @updatedAt @map("updated_at")
+
+  sender    User @relation(fields: [senderId], references: [id], name: "TransactionsAsSender")
+  recepient User @relation(fields: [recipientId], references: [id], name: "TransactionsAsRecipient")
+
+  @@map("transactions")
+}
