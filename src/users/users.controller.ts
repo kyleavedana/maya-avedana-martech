@@ -15,12 +15,27 @@ import {
   ApiResponse,
   ApiParam,
   ApiQuery,
+  ApiBody,
 } from '@nestjs/swagger';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { WhereUserDto } from './dto/where-user.dto';
 import { OrderByUserDto } from './dto/orderby-user.dto';
+
+const orderByEnum = [
+  'id',
+  'username',
+  'firstName',
+  'middleName',
+  'lastName',
+  'status',
+  'email',
+  'phoneNumber',
+  'createdAt',
+  'updatedAt',
+] as const;
+const orderEnum = ['asc', 'desc'] as const;
 
 @ApiTags('users')
 @Controller('users')
@@ -43,17 +58,16 @@ export class UsersController {
 
   @Get()
   @ApiOperation({
-    summary:
-      'Retrieve all users with optional pagination, filtering, and sorting',
+    summary: 'Retrieve all users with optional pagination',
   })
   @ApiQuery({
-    name: 'offset',
+    name: 'skip',
     required: false,
     type: Number,
     description: 'Number of records to skip',
   })
   @ApiQuery({
-    name: 'limit',
+    name: 'take',
     required: false,
     type: Number,
     description: 'Number of records to take',
@@ -65,34 +79,93 @@ export class UsersController {
     description: 'User ID for cursor-based pagination',
   })
   @ApiQuery({
-    name: 'where',
+    name: 'orderBy',
     required: false,
-    type: WhereUserDto,
-    description: 'Filter conditions (JSON object or string)',
+    type: 'string',
+    enum: orderByEnum,
+    description: 'Sorting key',
+  })
+  @ApiQuery({
+    name: 'order',
+    required: false,
+    type: 'string',
+    enum: orderEnum,
+    description: 'Sort',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Return users.',
+  })
+  findAll(
+    @Query('skip') skip?: number,
+    @Query('take') take?: number,
+    @Query('cursorId') cursorId?: string,
+    @Query('orderBy') orderBy?: (typeof orderByEnum)[number],
+    @Query('order') order?: (typeof orderEnum)[number],
+  ) {
+    return this.usersService.findAll({
+      skip: skip ? +skip : undefined,
+      take: take ? +take : undefined,
+      cursor: cursorId ? { id: cursorId } : undefined,
+      orderBy: orderBy ? { [orderBy]: order } : undefined,
+    });
+  }
+
+  @Post('search')
+  @ApiOperation({
+    summary: 'Search users with optional pagination',
+  })
+  @ApiQuery({
+    name: 'skip',
+    required: false,
+    type: Number,
+    description: 'Number of records to skip',
+  })
+  @ApiQuery({
+    name: 'take',
+    required: false,
+    type: Number,
+    description: 'Number of records to take',
+  })
+  @ApiQuery({
+    name: 'cursorId',
+    required: false,
+    type: String,
+    description: 'User ID for cursor-based pagination',
   })
   @ApiQuery({
     name: 'orderBy',
     required: false,
-    type: OrderByUserDto,
-    description: 'Sorting parameters (JSON object or string)',
+    type: 'string',
+    enum: orderByEnum,
+    description: 'Sorting key',
   })
+  @ApiQuery({
+    name: 'order',
+    required: false,
+    type: 'string',
+    enum: orderEnum,
+    description: 'Sort',
+  })
+  @ApiBody({ type: WhereUserDto })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Return all matching users.',
   })
-  findAll(
-    @Query('offset') offset?: number,
-    @Query('limit') limit?: number,
+  search(
+    @Query('skip') skip?: number,
+    @Query('take') take?: number,
     @Query('cursorId') cursorId?: string,
-    @Query('where') where?: WhereUserDto,
-    @Query('orderBy') orderBy?: OrderByUserDto,
+    @Query('orderBy') orderBy?: (typeof orderByEnum)[number],
+    @Query('order') order?: (typeof orderEnum)[number],
+    @Body() where?: WhereUserDto,
   ) {
     return this.usersService.findAll({
-      skip: offset ? +offset : undefined,
-      take: limit ? +limit : undefined,
+      skip: skip ? +skip : undefined,
+      take: take ? +take : undefined,
       cursor: cursorId ? { id: cursorId } : undefined,
       where,
-      orderBy,
+      orderBy: orderBy ? { [orderBy]: order } : undefined,
     });
   }
 
