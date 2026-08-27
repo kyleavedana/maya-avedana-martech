@@ -29,6 +29,7 @@ describe('TransactionsService', () => {
     /* eslint-disable-next-line */
     $transaction: jest.fn((cb) => cb(mockTxContext)),
     transaction: {
+      aggregate: jest.fn(),
       findMany: jest.fn(),
       findUnique: jest.fn(),
     },
@@ -64,12 +65,15 @@ describe('TransactionsService', () => {
     beforeEach(() => {
       mockTxContext.$queryRaw.mockResolvedValue([{ id: 'senderId' }]);
       mockTxContext.transaction.aggregate
-        .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal(0) } }) // daily
-        .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal(0) } }); // monthly
+        .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal(0) } })
+        .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal(0) } });
     });
 
     it('should create and return a transaction', async () => {
       mockTxContext.transaction.create.mockResolvedValue(mockTransaction);
+      mockTxContext.transaction.aggregate
+        .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal(49950) } })
+        .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal(0) } });
 
       const result = await service.create(dto);
 
@@ -87,6 +91,10 @@ describe('TransactionsService', () => {
     });
 
     it('should throw BadRequestException if amount is zero or negative', async () => {
+      mockTxContext.transaction.aggregate
+        .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal(49950) } })
+        .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal(0) } });
+
       await expect(
         service.create({ ...dto, amount: new Decimal(0) }),
       ).rejects.toThrow(

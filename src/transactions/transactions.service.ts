@@ -6,6 +6,7 @@ import {
 import { PrismaService } from '../prisma.service';
 import { Transaction, Prisma } from '../generated/prisma/client';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
+import { GetTransactionLimitDto } from './dto/get-transaction-limit.dto';
 
 @Injectable()
 export class TransactionsService {
@@ -14,10 +15,62 @@ export class TransactionsService {
   private readonly DAILY_LIMIT = 50000.0;
   private readonly MONTHLY_LIMIT = 500000.0;
 
-  async create(
-    createTransactionDto: CreateTransactionDto,
-  ): Promise<Transaction> {
-    const { senderId, recipientId, amount, ...rest } = createTransactionDto;
+  async getDailyTransferLimitData(
+    userId: string,
+    date: Date = new Date(),
+    prisma: Prisma.TransactionClient | PrismaService = this.prisma,
+  ): Promise<GetTransactionLimitDto> {
+    const startOfDay = new Date(
+      date.getFullYear(),
+      date.getMonth(),
+      date.getDate(),
+    );
+
+    const dailySpendResult = await prisma.transaction.aggregate({
+      _sum: { amount: true },
+      where: {
+        senderId: userId,
+        createdAt: { gte: startOfDay },
+      },
+    });
+
+    return {
+      duration: 'daily',
+      cap: this.DAILY_LIMIT,
+      used: Number(dailySpendResult?._sum?.amount?.toNumber() ?? 0),
+      remaining:
+        Number(this.DAILY_LIMIT) -
+        Number(dailySpendResult?._sum?.amount?.toNumber() ?? 0),
+    };
+  }
+
+  async getMonthlyTransferLimitData(
+    userId: string,
+    date: Date = new Date(),
+    prisma: Prisma.TransactionClient | PrismaService = this.prisma,
+  ): Promise<GetTransactionLimitDto> {
+    const startOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
+
+    const monthlySpendResult = await prisma.transaction.aggregate({
+      _sum: { amount: true },
+      where: {
+        senderId: userId,
+        createdAt: { gte: startOfMonth },
+      },
+    });
+
+    return {
+      duration: 'monthly',
+      cap: this.MONTHLY_LIMIT,
+      used: Number(monthlySpendResult?._sum?.amount?.toNumber() ?? 0),
+      remaining:
+        Number(this.MONTHLY_LIMIT) -
+        Number(monthlySpendResult?._sum?.amount?.toNumber() ?? 0),
+    };
+  }
+
+  async create(data: CreateTransactionDto): Promise<Transaction> {
+    const { senderId, recipientId, amount, ...rest } = data;
 
     const amountNumber =
       amount instanceof Prisma.Decimal ? amount.toNumber() : Number(amount);
@@ -36,42 +89,23 @@ export class TransactionsService {
           throw new NotFoundException('Sender user not found');
         }
 
-        const now = new Date();
-        const startOfDay = new Date(
-          now.getFullYear(),
-          now.getMonth(),
-          now.getDate(),
+        const currentDaily = await this.getDailyTransferLimitData(
+          data.senderId,
+          new Date(),
+          tx,
         );
-        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-
-        const dailySpendResult = await tx.transaction.aggregate({
-          _sum: { amount: true },
-          where: {
-            senderId,
-            createdAt: { gte: startOfDay },
-          },
-        });
-        const monthlySpendResult = await tx.transaction.aggregate({
-          _sum: { amount: true },
-          where: {
-            senderId,
-            createdAt: { gte: startOfMonth },
-          },
-        });
-
-        const currentDaily = Number(
-          dailySpendResult._sum.amount?.toNumber() ?? 0,
-        );
-        const currentMonthly = Number(
-          monthlySpendResult._sum.amount?.toNumber() ?? 0,
+        const currentMonthly = await this.getMonthlyTransferLimitData(
+          data.senderId,
+          new Date(),
+          tx,
         );
 
-        if (currentDaily + amountNumber > this.DAILY_LIMIT) {
+        if (Number(currentDaily.used) + amountNumber > this.DAILY_LIMIT) {
           throw new BadRequestException(
             `Daily limit of $${this.DAILY_LIMIT} exceeded`,
           );
         }
-        if (currentMonthly + amountNumber > this.MONTHLY_LIMIT) {
+        if (Number(currentMonthly.used) + amountNumber > this.MONTHLY_LIMIT) {
           throw new BadRequestException(
             `Monthly limit of $${this.MONTHLY_LIMIT} exceeded`,
           );

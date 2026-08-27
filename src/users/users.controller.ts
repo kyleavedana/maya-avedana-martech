@@ -259,6 +259,35 @@ export class UsersController {
     });
   }
 
+  @Get(':id/transactions/limit')
+  @ApiOperation({
+    summary: "Retrieve all user's transactions with optional pagination",
+  })
+  @ApiParam({
+    name: 'id',
+    required: true,
+  })
+  @ApiQuery({
+    name: 'duration',
+    required: true,
+    enum: ['daily', 'monthly'],
+    type: 'string',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Return daily limit.',
+  })
+  getDailyTransactionLimit(
+    @Param('id') id: string,
+    @Query('duration') duration: 'daily' | 'monthly',
+  ) {
+    if (duration === 'daily') {
+      return this.transactionsService.getDailyTransferLimitData(id);
+    } else if (duration === 'monthly') {
+      return this.transactionsService.getMonthlyTransferLimitData(id);
+    }
+  }
+
   @Post(':id/transactions/send-money')
   @ApiOperation({ summary: 'Send money' })
   @ApiParam({
