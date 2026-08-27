@@ -23,6 +23,10 @@ enum TransactionStatus {
   FAILED
 }
 
+enum Currency {
+  PHP
+}
+
 model User {
   id          String     @id @default(uuid())
   username    String     @unique
@@ -46,6 +50,7 @@ model Transaction {
   senderId      String            @map("sender_id")
   recipientId   String            @map("receiver_id")
   amount        Decimal           @db.Decimal(8, 2)
+  currency      Currency          @default(PHP)
   status        TransactionStatus @default(SUCCESS)
   failureReason String?           @map("failure_reason")
   createdAt     DateTime          @default(now()) @map("created_at")

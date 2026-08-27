@@ -29,7 +29,7 @@ const orderByEnum = [
 const orderEnum = ['asc', 'desc'] as const;
 
 @ApiTags('transactions')
-@Controller('transactions')
+@Controller('api/transactions')
 export class TransactionsController {
   constructor(private readonly transactionsService: TransactionsService) {}
 

@@ -39,7 +39,7 @@ const orderByEnum = [
 const orderEnum = ['asc', 'desc'] as const;
 
 @ApiTags('users')
-@Controller('users')
+@Controller('api/users')
 export class UsersController {
   constructor(
     private readonly usersService: UsersService,
@@ -308,11 +308,11 @@ export class UsersController {
   })
   createTransaction(
     @Param('id') id: string,
-    @Body() createTransactionDto: CreateTransactionNoSenderDto,
+    @Body() data: CreateTransactionNoSenderDto,
   ) {
     return this.transactionsService.create({
       senderId: id,
-      ...createTransactionDto,
+      ...data,
     });
   }
 }

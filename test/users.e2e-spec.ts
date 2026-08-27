@@ -110,7 +110,7 @@ describe('UsersController (e2e)', () => {
     jest.clearAllMocks();
   });
 
-  describe('/users (POST)', () => {
+  describe('/api/users (POST)', () => {
     it('should create a new user', () => {
       const createUserDto = {
         username: 'johndoe',
@@ -118,7 +118,7 @@ describe('UsersController (e2e)', () => {
       };
 
       return request(app.getHttpServer())
-        .post('/users')
+        .post('/api/users')
         .send(createUserDto)
         .expect(HttpStatus.CREATED)
         .expect((res) => {
@@ -130,10 +130,10 @@ describe('UsersController (e2e)', () => {
     });
   });
 
-  describe('/users (GET)', () => {
+  describe('/api/users (GET)', () => {
     it('should retrieve users with optional query parameters', () => {
       return request(app.getHttpServer())
-        .get('/users')
+        .get('/api/users')
         .query({
           skip: 0,
           take: 10,
@@ -162,14 +162,14 @@ describe('UsersController (e2e)', () => {
     });
   });
 
-  describe('/users/search (POST)', () => {
+  describe('/api/users/search (POST)', () => {
     it('should search users matching criteria', () => {
       const whereDto = {
         username: 'johndoe',
       };
 
       return request(app.getHttpServer())
-        .post('/users/search')
+        .post('/api/users/search')
         .query({
           skip: 0,
           take: 10,
@@ -196,10 +196,10 @@ describe('UsersController (e2e)', () => {
     });
   });
 
-  describe('/users/:id (GET)', () => {
+  describe('/api/users/:id (GET)', () => {
     it('should retrieve a single user by ID', () => {
       return request(app.getHttpServer())
-        .get('/users/1')
+        .get('/api/users/1')
         .expect(HttpStatus.OK)
         .expect((res) => {
           expect(res.body).toEqual({
@@ -215,14 +215,14 @@ describe('UsersController (e2e)', () => {
     });
   });
 
-  describe('/users/:id (PATCH)', () => {
+  describe('/api/users/:id (PATCH)', () => {
     it('should update a user by ID', () => {
       const updateUserDto = {
         username: 'john_updated',
       };
 
       return request(app.getHttpServer())
-        .patch('/users/1')
+        .patch('/api/users/1')
         .send(updateUserDto)
         .expect(HttpStatus.OK)
         .expect((res) => {
@@ -241,10 +241,10 @@ describe('UsersController (e2e)', () => {
     });
   });
 
-  describe('/users/:id/transactions (GET)', () => {
+  describe('/api/users/:id/transactions (GET)', () => {
     it('should retrieve user transactions', () => {
       return request(app.getHttpServer())
-        .get('/users/1/transactions')
+        .get('/api/users/1/transactions')
         .query({
           skip: 0,
           take: 10,
@@ -284,10 +284,10 @@ describe('UsersController (e2e)', () => {
     });
   });
 
-  describe('/users/:id/transactions/limit (GET)', () => {
+  describe('/api/users/:id/transactions/limit (GET)', () => {
     it('should retrieve the daily transaction limit', () => {
       return request(app.getHttpServer())
-        .get('/users/1/transactions/limit')
+        .get('/api/users/1/transactions/limit')
         .query({
           duration: 'daily',
         })
@@ -308,7 +308,7 @@ describe('UsersController (e2e)', () => {
 
     it('should retrieve the monthly transaction limit', () => {
       return request(app.getHttpServer())
-        .get('/users/1/transactions/limit')
+        .get('/api/users/1/transactions/limit')
         .query({
           duration: 'monthly',
         })
@@ -328,7 +328,7 @@ describe('UsersController (e2e)', () => {
     });
   });
 
-  describe('/users/:id/transactions/send-money (POST)', () => {
+  describe('/api/users/:id/transactions/send-money (POST)', () => {
     it('should process a send money request', () => {
       const body = {
         recipientId: '2',
@@ -336,7 +336,7 @@ describe('UsersController (e2e)', () => {
       };
 
       return request(app.getHttpServer())
-        .post('/users/1/transactions/send-money')
+        .post('/api/users/1/transactions/send-money')
         .send(body)
         .expect(HttpStatus.CREATED)
         .expect((res) => {

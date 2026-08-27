@@ -7,24 +7,57 @@ import { PrismaService } from '../prisma.service';
 import { Transaction, Prisma } from '../generated/prisma/client';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
 import { GetTransactionLimitDto } from './dto/get-transaction-limit.dto';
+import { TZDate } from '@date-fns/tz';
 
 @Injectable()
 export class TransactionsService {
   constructor(private prisma: PrismaService) {}
 
-  private readonly DAILY_LIMIT = 50000.0;
-  private readonly MONTHLY_LIMIT = 500000.0;
+  private readonly TIMEZONE = 'Asia/Manila';
+  private readonly DAILY_LIMIT = new Prisma.Decimal(50000.0);
+  private readonly MONTHLY_LIMIT = new Prisma.Decimal(500000.0);
+
+  /**
+   * Helper to fetch current date/time anchored to Asia/Manila.
+   */
+  private getManilaDate(date: Date = new Date()): TZDate {
+    return new TZDate(date, this.TIMEZONE);
+  }
+
+  /**
+   * Returns start of day (00:00:00.000) in Asia/Manila converted to UTC Date
+   */
+  private getStartOfDayPHT(date: Date = new Date()): Date {
+    const manila = this.getManilaDate(date);
+    return new Date(
+      Date.UTC(
+        manila.getFullYear(),
+        manila.getMonth(),
+        manila.getDate(),
+        -8,
+        0,
+        0,
+        0,
+      ),
+    );
+  }
+
+  /**
+   * Returns start of month (1st 00:00:00.000) in Asia/Manila converted to UTC Date
+   */
+  private getStartOfMonthPHT(date: Date = new Date()): Date {
+    const manila = this.getManilaDate(date);
+    return new Date(
+      Date.UTC(manila.getFullYear(), manila.getMonth(), 1, -8, 0, 0, 0),
+    );
+  }
 
   async getDailyTransferLimitData(
     userId: string,
     date: Date = new Date(),
     prisma: Prisma.TransactionClient | PrismaService = this.prisma,
   ): Promise<GetTransactionLimitDto> {
-    const startOfDay = new Date(
-      date.getFullYear(),
-      date.getMonth(),
-      date.getDate(),
-    );
+    const startOfDay = this.getStartOfDayPHT(date);
 
     const dailySpendResult = await prisma.transaction.aggregate({
       _sum: { amount: true },
@@ -34,13 +67,14 @@ export class TransactionsService {
       },
     });
 
+    const used = dailySpendResult?._sum?.amount ?? new Prisma.Decimal(0);
+    const remaining = Prisma.Decimal.max(0, this.DAILY_LIMIT.sub(used));
+
     return {
       duration: 'daily',
-      cap: this.DAILY_LIMIT,
-      used: Number(dailySpendResult?._sum?.amount?.toNumber() ?? 0),
-      remaining:
-        Number(this.DAILY_LIMIT) -
-        Number(dailySpendResult?._sum?.amount?.toNumber() ?? 0),
+      cap: this.DAILY_LIMIT.toNumber(),
+      used: used.toNumber(),
+      remaining: remaining.toNumber(),
     };
   }
 
@@ -49,7 +83,7 @@ export class TransactionsService {
     date: Date = new Date(),
     prisma: Prisma.TransactionClient | PrismaService = this.prisma,
   ): Promise<GetTransactionLimitDto> {
-    const startOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
+    const startOfMonth = this.getStartOfMonthPHT(date);
 
     const monthlySpendResult = await prisma.transaction.aggregate({
       _sum: { amount: true },
@@ -59,28 +93,34 @@ export class TransactionsService {
       },
     });
 
+    const used = monthlySpendResult?._sum?.amount ?? new Prisma.Decimal(0);
+    const remaining = Prisma.Decimal.max(0, this.MONTHLY_LIMIT.sub(used));
+
     return {
       duration: 'monthly',
-      cap: this.MONTHLY_LIMIT,
-      used: Number(monthlySpendResult?._sum?.amount?.toNumber() ?? 0),
-      remaining:
-        Number(this.MONTHLY_LIMIT) -
-        Number(monthlySpendResult?._sum?.amount?.toNumber() ?? 0),
+      cap: this.MONTHLY_LIMIT.toNumber(),
+      used: used.toNumber(),
+      remaining: remaining.toNumber(),
     };
   }
 
   async create(data: CreateTransactionDto): Promise<Transaction> {
     const { senderId, recipientId, amount, ...rest } = data;
+    const decimalAmount = new Prisma.Decimal(amount);
 
-    const amountNumber =
-      amount instanceof Prisma.Decimal ? amount.toNumber() : Number(amount);
-
-    if (amountNumber <= 0) {
+    if (decimalAmount.lte(0)) {
       throw new BadRequestException('Amount must be greater than 0');
+    }
+
+    if (senderId === recipientId) {
+      throw new BadRequestException(
+        'Sender and recipient cannot be the same user',
+      );
     }
 
     try {
       return await this.prisma.$transaction(async (tx) => {
+        // Lock sender record row to prevent race conditions during aggregations
         const sender = await tx.$queryRaw<Array<{ id: string }>>`
           SELECT id FROM "users" WHERE id = ${senderId} FOR UPDATE
         `;
@@ -90,37 +130,41 @@ export class TransactionsService {
         }
 
         const currentDaily = await this.getDailyTransferLimitData(
-          data.senderId,
+          senderId,
           new Date(),
           tx,
         );
         const currentMonthly = await this.getMonthlyTransferLimitData(
-          data.senderId,
+          senderId,
           new Date(),
           tx,
         );
 
-        if (Number(currentDaily.used) + amountNumber > this.DAILY_LIMIT) {
+        const newDailyTotal = new Prisma.Decimal(currentDaily.used).add(
+          decimalAmount,
+        );
+        const newMonthlyTotal = new Prisma.Decimal(currentMonthly.used).add(
+          decimalAmount,
+        );
+
+        if (newDailyTotal.gt(this.DAILY_LIMIT)) {
           throw new BadRequestException(
-            `Daily limit of $${this.DAILY_LIMIT} exceeded`,
+            `Daily transfer limit of ₱${this.DAILY_LIMIT.toLocaleString()} exceeded`,
           );
         }
-        if (Number(currentMonthly.used) + amountNumber > this.MONTHLY_LIMIT) {
+
+        if (newMonthlyTotal.gt(this.MONTHLY_LIMIT)) {
           throw new BadRequestException(
-            `Monthly limit of $${this.MONTHLY_LIMIT} exceeded`,
+            `Monthly transfer limit of ₱${this.MONTHLY_LIMIT.toLocaleString()} exceeded`,
           );
         }
 
         return await tx.transaction.create({
           data: {
             ...rest,
-            amount: new Prisma.Decimal(amount),
-            sender: {
-              connect: { id: senderId },
-            },
-            recipient: {
-              connect: { id: recipientId },
-            },
+            amount: decimalAmount,
+            sender: { connect: { id: senderId } },
+            recipient: { connect: { id: recipientId } },
           },
         });
       });

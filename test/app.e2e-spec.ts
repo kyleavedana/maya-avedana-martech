@@ -16,8 +16,8 @@ describe('AppController (e2e)', () => {
     await app.init();
   });
 
-  it('/', () => {
-    return request(app.getHttpServer()).get('/').expect(200);
+  it('/api', () => {
+    return request(app.getHttpServer()).get('/api').expect(200);
   });
 
   afterEach(async () => {

@@ -34,7 +34,7 @@ services:
       postgres:
         condition: service_healthy
     command: >
-      sh -c "npx prisma migrate deploy && node dist/src/main"
+      sh -c "npx prisma db push && npm install --save-dev tsx && npx prisma db seed && node dist/src/main"
 
 volumes:
   postgres_data:

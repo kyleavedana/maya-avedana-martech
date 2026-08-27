@@ -26,6 +26,8 @@ export default tseslint.config(
   },
   {
     rules: {
+      '@typescript-eslint/no-unsafe-assignment': 'warn',
+      '@typescript-eslint/no-unsafe-member-access': 'warn',
       'prettier/prettier': ['error', { endOfLine: 'auto' }],
     },
   },

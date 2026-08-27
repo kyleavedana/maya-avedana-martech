@@ -41,10 +41,10 @@ describe('TransactionsController (e2e)', () => {
     await app.init();
   });
 
-  describe('/transactions (GET)', () => {
+  describe('/api/transactions (GET)', () => {
     it('should retrieve all transactions with optional query parameters', () => {
       return request(app.getHttpServer())
-        .get('/transactions')
+        .get('/api/transactions')
         .query({ skip: 0, take: 10, orderBy: 'amount', order: 'asc' })
         .expect(HttpStatus.OK)
         .expect((res) => {
@@ -55,12 +55,12 @@ describe('TransactionsController (e2e)', () => {
     });
   });
 
-  describe('/transactions/search (POST)', () => {
+  describe('/api/transactions/search (POST)', () => {
     it('should search transactions matching criteria', () => {
       const whereDto = { status: 'COMPLETED' };
 
       return request(app.getHttpServer())
-        .post('/transactions/search')
+        .post('/api/transactions/search')
         .query({ skip: 0, take: 10 })
         .send(whereDto)
         .expect(HttpStatus.OK)
@@ -72,10 +72,10 @@ describe('TransactionsController (e2e)', () => {
     });
   });
 
-  describe('/transactions/:id (GET)', () => {
+  describe('/api/transactions/:id (GET)', () => {
     it('should retrieve a single transaction by ID', () => {
       return request(app.getHttpServer())
-        .get('/transactions/1')
+        .get('/api/transactions/1')
         .expect(HttpStatus.OK)
         .expect((res) => {
           expect(res.body).toEqual({

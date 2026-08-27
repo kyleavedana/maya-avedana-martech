@@ -23,6 +23,9 @@ describe('TransactionsService', () => {
       aggregate: jest.fn(),
       create: jest.fn(),
     },
+    user: {
+      findUnique: jest.fn(),
+    },
   };
 
   const mockPrismaService = {
@@ -125,7 +128,7 @@ describe('TransactionsService', () => {
       await expect(
         service.create({ ...dto, amount: new Decimal(100) }),
       ).rejects.toThrow(
-        new BadRequestException('Daily limit of $50000 exceeded'),
+        new BadRequestException('Daily transfer limit of ₱50000 exceeded'),
       );
     });
 
@@ -140,7 +143,7 @@ describe('TransactionsService', () => {
       await expect(
         service.create({ ...dto, amount: new Decimal(100) }),
       ).rejects.toThrow(
-        new BadRequestException('Monthly limit of $500000 exceeded'),
+        new BadRequestException('Monthly transfer limit of ₱500000 exceeded'),
       );
     });
 
