@@ -22,6 +22,7 @@ import { TransactionsService } from '../transactions/transactions.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { WhereUserDto } from './dto/where-user.dto';
+import { CreateTransactionNoSenderDto } from '../transactions/dto/create-transaction-no-sender.dto';
 
 const orderByEnum = [
   'id',
@@ -255,6 +256,34 @@ export class UsersController {
       cursor: cursorId ? { id: cursorId } : undefined,
       orderBy: orderBy ? { [orderBy]: order } : { createdAt: 'desc' },
       where: { OR: [{ senderId: id }, { recipientId: id }] },
+    });
+  }
+
+  @Post(':id/transactions/send-money')
+  @ApiOperation({ summary: 'Send money' })
+  @ApiParam({
+    name: 'id',
+    required: true,
+  })
+  @ApiResponse({
+    status: HttpStatus.CREATED,
+    description: 'The transaction has been successfully created.',
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Invalid body input.',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Sender or Recipient user not found',
+  })
+  createTransaction(
+    @Param('id') id: string,
+    @Body() createTransactionDto: CreateTransactionNoSenderDto,
+  ) {
+    return this.transactionsService.create({
+      senderId: id,
+      ...createTransactionDto,
     });
   }
 }

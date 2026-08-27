@@ -17,7 +17,6 @@ import {
   ApiBody,
 } from '@nestjs/swagger';
 import { TransactionsService } from './transactions.service';
-import { CreateTransactionDto } from './dto/create-transaction.dto';
 import { WhereTransactionDto } from './dto/where-transaction.dto';
 
 const orderByEnum = [
@@ -33,24 +32,6 @@ const orderEnum = ['asc', 'desc'] as const;
 @Controller('transactions')
 export class TransactionsController {
   constructor(private readonly transactionsService: TransactionsService) {}
-
-  @Post()
-  @ApiOperation({ summary: 'Create a new transaction' })
-  @ApiResponse({
-    status: HttpStatus.CREATED,
-    description: 'The transaction has been successfully created.',
-  })
-  @ApiResponse({
-    status: HttpStatus.BAD_REQUEST,
-    description: 'Invalid body input.',
-  })
-  @ApiResponse({
-    status: HttpStatus.NOT_FOUND,
-    description: 'Sender or Recipient user not found',
-  })
-  create(@Body() createTransactionDto: CreateTransactionDto) {
-    return this.transactionsService.create(createTransactionDto);
-  }
 
   @Get()
   @ApiOperation({

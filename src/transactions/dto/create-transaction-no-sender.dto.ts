@@ -2,15 +2,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { IsNotEmpty, IsNumber, IsPositive, IsUUID } from 'class-validator';
 import { Decimal } from '@prisma/client/runtime/client';
 
-export class CreateTransactionDto {
-  @ApiProperty({
-    example: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
-    description: 'UUID of the sender user',
-  })
-  @IsUUID()
-  @IsNotEmpty()
-  senderId!: string;
-
+export class CreateTransactionNoSenderDto {
   @ApiProperty({
     example: 'b1ffcd00-0d1c-5fg9-cc7e-7cc0ce491b22',
     description: 'UUID of the recipient user',

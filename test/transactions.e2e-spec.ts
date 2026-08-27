@@ -41,24 +41,6 @@ describe('TransactionsController (e2e)', () => {
     await app.init();
   });
 
-  describe('/transactions (POST)', () => {
-    it('should create a new transaction', () => {
-      const createTransactionDto = { amount: 100 };
-
-      return request(app.getHttpServer())
-        .post('/transactions')
-        .send(createTransactionDto)
-        .expect(HttpStatus.CREATED)
-        .expect((res) => {
-          expect(res.body).toEqual({
-            id: '1',
-            status: 'PENDING',
-            ...createTransactionDto,
-          });
-        });
-    });
-  });
-
   describe('/transactions (GET)', () => {
     it('should retrieve all transactions with optional query parameters', () => {
       return request(app.getHttpServer())

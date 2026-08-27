@@ -1,9 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { TransactionsController } from './transactions.controller';
 import { TransactionsService } from './transactions.service';
-import { CreateTransactionDto } from './dto/create-transaction.dto';
 import { WhereTransactionDto } from './dto/where-transaction.dto';
-import { Decimal } from '@prisma/client/runtime/client';
 import { TransactionStatus } from '../generated/prisma/client';
 
 describe('TransactionsController', () => {
@@ -39,25 +37,6 @@ describe('TransactionsController', () => {
 
   it('should be defined', () => {
     expect(controller).toBeDefined();
-  });
-
-  describe('create', () => {
-    it('should create a transaction', async () => {
-      const createTransactionDto: CreateTransactionDto = {
-        senderId: 'id',
-        recipientId: 'id',
-        amount: new Decimal(100),
-      };
-
-      mockTransactionsService.create.mockResolvedValue(mockTransaction);
-
-      const result = await controller.create(createTransactionDto);
-
-      expect(mockTransactionsService.create).toHaveBeenCalledWith(
-        createTransactionDto,
-      );
-      expect(result).toEqual(mockTransaction);
-    });
   });
 
   describe('findAll', () => {
