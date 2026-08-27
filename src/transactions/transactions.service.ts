@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { Transaction, Prisma } from '../generated/prisma/client';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
@@ -12,17 +12,27 @@ export class TransactionsService {
   ): Promise<Transaction> {
     const { senderId, recipientId, ...rest } = createTransactionDto;
 
-    return this.prisma.transaction.create({
-      data: {
-        ...rest,
-        sender: {
-          connect: { id: senderId },
+    try {
+      return await this.prisma.transaction.create({
+        data: {
+          ...rest,
+          sender: {
+            connect: { id: senderId },
+          },
+          recipient: {
+            connect: { id: recipientId },
+          },
         },
-        recipient: {
-          connect: { id: recipientId },
-        },
-      },
-    });
+      });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2025'
+      ) {
+        throw new NotFoundException('Sender or Recipient user not found');
+      }
+      throw error;
+    }
   }
 
   async findAll(params: {

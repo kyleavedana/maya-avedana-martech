@@ -1,7 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { NotFoundException } from '@nestjs/common';
 import { TransactionsService } from './transactions.service';
 import { PrismaService } from '../prisma.service';
-import { Transaction } from '../generated/prisma/client';
+import { Transaction, Prisma } from '../generated/prisma/client';
 import { Decimal } from '@prisma/client/runtime/client';
 
 describe('TransactionsService', () => {
@@ -67,6 +68,27 @@ describe('TransactionsService', () => {
         data: expectedPrismaData,
       });
       expect(result).toEqual(mockTransaction);
+    });
+    it('should throw NotFoundException when sender or recipient is not found', async () => {
+      const prismaError = new Prisma.PrismaClientKnownRequestError(
+        'An operation failed because it depends on one or more records that were required but not found.',
+        {
+          code: 'P2025',
+          clientVersion: '5.0.0',
+        },
+      );
+
+      mockPrismaService.transaction.create.mockRejectedValue(prismaError);
+
+      await expect(
+        service.create({
+          senderId: 'invalid-sender-id',
+          recipientId: 'invalid-recipient-id',
+          amount: new Decimal(100),
+        }),
+      ).rejects.toThrow(
+        new NotFoundException('Sender or Recipient user not found'),
+      );
     });
   });
 

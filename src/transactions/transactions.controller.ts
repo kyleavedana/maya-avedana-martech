@@ -44,6 +44,10 @@ export class TransactionsController {
     status: HttpStatus.BAD_REQUEST,
     description: 'Invalid body input.',
   })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Sender or Recipient user not found',
+  })
   create(@Body() createTransactionDto: CreateTransactionDto) {
     return this.transactionsService.create(createTransactionDto);
   }
