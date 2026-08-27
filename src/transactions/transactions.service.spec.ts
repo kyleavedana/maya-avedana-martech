@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException } from '@nestjs/common';
+import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { TransactionsService } from './transactions.service';
 import { PrismaService } from '../prisma.service';
 import { Transaction, Prisma } from '../generated/prisma/client';
@@ -9,15 +9,26 @@ describe('TransactionsService', () => {
   let service: TransactionsService;
 
   const mockTransaction: Transaction = {
-    id: 'id',
+    id: 'tx-1',
     senderId: 'senderId',
     recipientId: 'recipientId',
-    amount: new Decimal(100),
+    amount: new Prisma.Decimal(100),
+    createdAt: new Date(),
+    updatedAt: new Date(),
   } as Transaction;
 
-  const mockPrismaService = {
+  const mockTxContext = {
+    $queryRaw: jest.fn(),
     transaction: {
+      aggregate: jest.fn(),
       create: jest.fn(),
+    },
+  };
+
+  const mockPrismaService = {
+    /* eslint-disable-next-line */
+    $transaction: jest.fn((cb) => cb(mockTxContext)),
+    transaction: {
       findMany: jest.fn(),
       findUnique: jest.fn(),
     },
@@ -44,49 +55,96 @@ describe('TransactionsService', () => {
   });
 
   describe('create', () => {
+    const dto = {
+      senderId: 'senderId',
+      recipientId: 'recipientId',
+      amount: new Decimal(100),
+    };
+
+    beforeEach(() => {
+      mockTxContext.$queryRaw.mockResolvedValue([{ id: 'senderId' }]);
+      mockTxContext.transaction.aggregate
+        .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal(0) } }) // daily
+        .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal(0) } }); // monthly
+    });
+
     it('should create and return a transaction', async () => {
-      const createInput = {
-        id: 'id',
-        senderId: 'senderId',
-        recipientId: 'recipientId',
-        amount: new Decimal(100),
-        sender: { connect: { id: 'senderId' } },
-        recipient: { connect: { id: 'recipientId' } },
-      };
+      mockTxContext.transaction.create.mockResolvedValue(mockTransaction);
 
-      const { senderId, recipientId, ...expectedPrismaData } = createInput;
+      const result = await service.create(dto);
 
-      mockPrismaService.transaction.create.mockResolvedValue(mockTransaction);
-
-      const result = await service.create({
-        senderId,
-        recipientId,
-        ...expectedPrismaData,
-      });
-
-      expect(mockPrismaService.transaction.create).toHaveBeenCalledWith({
-        data: expectedPrismaData,
+      expect(mockPrismaService.$transaction).toHaveBeenCalled();
+      expect(mockTxContext.$queryRaw).toHaveBeenCalled();
+      expect(mockTxContext.transaction.aggregate).toHaveBeenCalledTimes(2);
+      expect(mockTxContext.transaction.create).toHaveBeenCalledWith({
+        data: {
+          amount: new Prisma.Decimal(dto.amount),
+          sender: { connect: { id: dto.senderId } },
+          recipient: { connect: { id: dto.recipientId } },
+        },
       });
       expect(result).toEqual(mockTransaction);
     });
-    it('should throw NotFoundException when sender or recipient is not found', async () => {
-      const prismaError = new Prisma.PrismaClientKnownRequestError(
-        'An operation failed because it depends on one or more records that were required but not found.',
-        {
-          code: 'P2025',
-          clientVersion: '5.0.0',
-        },
+
+    it('should throw BadRequestException if amount is zero or negative', async () => {
+      await expect(
+        service.create({ ...dto, amount: new Decimal(0) }),
+      ).rejects.toThrow(
+        new BadRequestException('Amount must be greater than 0'),
       );
 
-      mockPrismaService.transaction.create.mockRejectedValue(prismaError);
+      await expect(
+        service.create({ ...dto, amount: new Decimal(-10) }),
+      ).rejects.toThrow(
+        new BadRequestException('Amount must be greater than 0'),
+      );
+    });
+
+    it('should throw NotFoundException if sender does not exist in raw query', async () => {
+      mockTxContext.$queryRaw.mockResolvedValue([]);
+
+      await expect(service.create(dto)).rejects.toThrow(
+        new NotFoundException('Sender user not found'),
+      );
+    });
+
+    it('should throw BadRequestException if daily limit is exceeded', async () => {
+      mockTxContext.transaction.aggregate.mockReset();
+      mockTxContext.transaction.aggregate
+        .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal(49950) } }) // daily
+        .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal(49950) } }); // monthly
 
       await expect(
-        service.create({
-          senderId: 'invalid-sender-id',
-          recipientId: 'invalid-recipient-id',
-          amount: new Decimal(100),
-        }),
+        service.create({ ...dto, amount: new Decimal(100) }),
       ).rejects.toThrow(
+        new BadRequestException('Daily limit of $50000 exceeded'),
+      );
+    });
+
+    it('should throw BadRequestException if monthly limit is exceeded', async () => {
+      mockTxContext.transaction.aggregate.mockReset();
+      mockTxContext.transaction.aggregate
+        .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal(0) } })
+        .mockResolvedValueOnce({
+          _sum: { amount: new Prisma.Decimal(499950) },
+        });
+
+      await expect(
+        service.create({ ...dto, amount: new Decimal(100) }),
+      ).rejects.toThrow(
+        new BadRequestException('Monthly limit of $500000 exceeded'),
+      );
+    });
+
+    it('should catch Prisma P2025 error and throw NotFoundException', async () => {
+      const prismaError = new Prisma.PrismaClientKnownRequestError(
+        'Record required but not found.',
+        { code: 'P2025', clientVersion: '5.0.0' },
+      );
+
+      mockTxContext.transaction.create.mockRejectedValue(prismaError);
+
+      await expect(service.create(dto)).rejects.toThrow(
         new NotFoundException('Sender or Recipient user not found'),
       );
     });
@@ -105,13 +163,9 @@ describe('TransactionsService', () => {
 
       const result = await service.findAll(params);
 
-      expect(mockPrismaService.transaction.findMany).toHaveBeenCalledWith({
-        skip: params.skip,
-        take: params.take,
-        cursor: undefined,
-        where: params.where,
-        orderBy: undefined,
-      });
+      expect(mockPrismaService.transaction.findMany).toHaveBeenCalledWith(
+        params,
+      );
       expect(result).toEqual(transactions);
     });
   });
@@ -122,10 +176,10 @@ describe('TransactionsService', () => {
         mockTransaction,
       );
 
-      const result = await service.findOne({ id: '1' });
+      const result = await service.findOne({ id: 'tx-1' });
 
       expect(mockPrismaService.transaction.findUnique).toHaveBeenCalledWith({
-        where: { id: '1' },
+        where: { id: 'tx-1' },
       });
       expect(result).toEqual(mockTransaction);
     });
