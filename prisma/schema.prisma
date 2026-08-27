@@ -45,7 +45,7 @@ model Transaction {
   id            String            @id @default(uuid())
   senderId      String            @map("sender_id")
   recipientId   String            @map("receiver_id")
-  amount        Decimal           @db.Decimal(6, 2)
+  amount        Decimal           @db.Decimal(8, 2)
   status        TransactionStatus @default(SUCCESS)
   failureReason String?           @map("failure_reason")
   createdAt     DateTime          @default(now()) @map("created_at")
