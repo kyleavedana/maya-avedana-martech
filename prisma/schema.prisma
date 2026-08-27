@@ -52,7 +52,7 @@ model Transaction {
   updatedAt     DateTime          @updatedAt @map("updated_at")
 
   sender    User @relation(fields: [senderId], references: [id], name: "TransactionsAsSender")
-  recepient User @relation(fields: [recipientId], references: [id], name: "TransactionsAsRecipient")
+  recipient User @relation(fields: [recipientId], references: [id], name: "TransactionsAsRecipient")
 
   @@map("transactions")
 }
