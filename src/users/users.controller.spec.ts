@@ -4,6 +4,7 @@ import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { WhereUserDto } from './dto/where-user.dto';
+import { TransactionsModule } from '../transactions/transactions.module';
 
 describe('UsersController', () => {
   let controller: UsersController;
@@ -31,6 +32,7 @@ describe('UsersController', () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
+      imports: [TransactionsModule],
       controllers: [UsersController],
       providers: [
         {
@@ -152,17 +154,6 @@ describe('UsersController', () => {
         data: updateUserDto,
       });
       expect(result).toEqual(updatedUser);
-    });
-  });
-
-  describe('remove', () => {
-    it('should remove a user by ID', async () => {
-      mockUsersService.remove.mockResolvedValue(mockUser);
-
-      const result = await controller.remove('123-abc');
-
-      expect(mockUsersService.remove).toHaveBeenCalledWith({ id: '123-abc' });
-      expect(result).toEqual(mockUser);
     });
   });
 });

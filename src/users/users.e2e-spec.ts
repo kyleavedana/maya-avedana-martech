@@ -1,206 +1,180 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Patch,
-  Param,
-  Delete,
-  Query,
-  HttpStatus,
-} from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiParam,
-  ApiQuery,
-  ApiBody,
-} from '@nestjs/swagger';
-import { UsersService } from './users.service';
-import { CreateUserDto } from './dto/create-user.dto';
-import { UpdateUserDto } from './dto/update-user.dto';
-import { WhereUserDto } from './dto/where-user.dto';
+import { Test, TestingModule } from '@nestjs/testing';
+import { INestApplication, HttpStatus } from '@nestjs/common';
+import request from 'supertest';
+import { App } from 'supertest/types';
+import { AppModule } from '../app.module';
+import { UsersService } from '../users/users.service';
 
-const orderByEnum = [
-  'id',
-  'username',
-  'firstName',
-  'middleName',
-  'lastName',
-  'status',
-  'email',
-  'phoneNumber',
-  'createdAt',
-  'updatedAt',
-] as const;
-const orderEnum = ['asc', 'desc'] as const;
+describe('UsersController (e2e)', () => {
+  let app: INestApplication<App>;
 
-@ApiTags('users')
-@Controller('users')
-export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  const mockUsersService = {
+    create: jest
+      .fn()
+      .mockImplementation((dto) =>
+        Promise.resolve({ id: '1', status: 'ACTIVE', ...dto }),
+      ),
+    findAll: jest.fn().mockResolvedValue([
+      {
+        id: '1',
+        username: 'johndoe',
+        email: 'john@example.com',
+        status: 'ACTIVE',
+      },
+    ]),
+    findOne: jest.fn().mockImplementation(({ id }) => {
+      if (id === '1') {
+        return Promise.resolve({
+          id: '1',
+          username: 'johndoe',
+          email: 'john@example.com',
+          status: 'ACTIVE',
+        });
+      }
+      return Promise.resolve(null);
+    }),
+    update: jest.fn().mockImplementation(
+      /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+      ({ where, data }: { where: { id: string }; data: any }) => {
+        if (where.id === '1') {
+          return Promise.resolve({
+            id: '1',
+            username: 'johndoe',
+            email: 'john@example.com',
+            status: 'ACTIVE',
+            ...data,
+          });
+        }
+        return Promise.resolve(null);
+      },
+    ),
+  };
 
-  @Post()
-  @ApiOperation({ summary: 'Create a new user' })
-  @ApiResponse({
-    status: HttpStatus.CREATED,
-    description: 'The user has been successfully created.',
-  })
-  @ApiResponse({
-    status: HttpStatus.BAD_REQUEST,
-    description: 'Invalid body input.',
-  })
-  create(@Body() createUserDto: CreateUserDto) {
-    return this.usersService.create(createUserDto);
-  }
+  beforeEach(async () => {
+    const moduleFixture: TestingModule = await Test.createTestingModule({
+      imports: [AppModule],
+    })
+      .overrideProvider(UsersService)
+      .useValue(mockUsersService)
+      .compile();
 
-  @Get()
-  @ApiOperation({
-    summary: 'Retrieve all users with optional pagination',
-  })
-  @ApiQuery({
-    name: 'skip',
-    required: false,
-    type: Number,
-    description: 'Number of records to skip',
-  })
-  @ApiQuery({
-    name: 'take',
-    required: false,
-    type: Number,
-    description: 'Number of records to take',
-  })
-  @ApiQuery({
-    name: 'cursorId',
-    required: false,
-    type: String,
-    description: 'User ID for cursor-based pagination',
-  })
-  @ApiQuery({
-    name: 'orderBy',
-    required: false,
-    type: 'string',
-    enum: orderByEnum,
-    description: 'Sorting key',
-  })
-  @ApiQuery({
-    name: 'order',
-    required: false,
-    type: 'string',
-    enum: orderEnum,
-    description: 'Sort',
-  })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'Return users.',
-  })
-  findAll(
-    @Query('skip') skip?: number,
-    @Query('take') take?: number,
-    @Query('cursorId') cursorId?: string,
-    @Query('orderBy') orderBy?: (typeof orderByEnum)[number],
-    @Query('order') order?: (typeof orderEnum)[number],
-  ) {
-    return this.usersService.findAll({
-      skip: skip !== undefined ? +skip : undefined,
-      take: take !== undefined ? +take : undefined,
-      cursor: cursorId ? { id: cursorId } : undefined,
-      orderBy: orderBy ? { [orderBy]: order } : undefined,
+    app = moduleFixture.createNestApplication();
+    await app.init();
+  });
+
+  describe('/users (POST)', () => {
+    it('should create a new user', () => {
+      const createUserDto = {
+        username: 'johndoe',
+        email: 'john@example.com',
+        firstName: 'John',
+        lastName: 'Doe',
+      };
+
+      return request(app.getHttpServer())
+        .post('/users')
+        .send(createUserDto)
+        .expect(HttpStatus.CREATED)
+        .expect((res) => {
+          expect(res.body).toEqual({
+            id: '1',
+            status: 'ACTIVE',
+            ...createUserDto,
+          });
+        });
     });
-  }
+  });
 
-  @Post('search')
-  @ApiOperation({
-    summary: 'Search users with optional pagination',
-  })
-  @ApiQuery({
-    name: 'skip',
-    required: false,
-    type: Number,
-    description: 'Number of records to skip',
-  })
-  @ApiQuery({
-    name: 'take',
-    required: false,
-    type: Number,
-    description: 'Number of records to take',
-  })
-  @ApiQuery({
-    name: 'cursorId',
-    required: false,
-    type: String,
-    description: 'User ID for cursor-based pagination',
-  })
-  @ApiQuery({
-    name: 'orderBy',
-    required: false,
-    type: 'string',
-    enum: orderByEnum,
-    description: 'Sorting key',
-  })
-  @ApiQuery({
-    name: 'order',
-    required: false,
-    type: 'string',
-    enum: orderEnum,
-    description: 'Sort',
-  })
-  @ApiBody({ type: WhereUserDto })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'Return all matching users.',
-  })
-  search(
-    @Query('skip') skip?: number,
-    @Query('take') take?: number,
-    @Query('cursorId') cursorId?: string,
-    @Query('orderBy') orderBy?: (typeof orderByEnum)[number],
-    @Query('order') order?: (typeof orderEnum)[number],
-    @Body() where?: WhereUserDto,
-  ) {
-    return this.usersService.findAll({
-      skip: skip !== undefined ? +skip : undefined,
-      take: take !== undefined ? +take : undefined,
-      cursor: cursorId ? { id: cursorId } : undefined,
-      where,
-      orderBy: orderBy ? { [orderBy]: order } : undefined,
+  describe('/users (GET)', () => {
+    it('should retrieve all users with optional query parameters', () => {
+      return request(app.getHttpServer())
+        .get('/users')
+        .query({
+          skip: 0,
+          take: 10,
+          cursorId: '1',
+          orderBy: 'username',
+          order: 'asc',
+        })
+        .expect(HttpStatus.OK)
+        .expect((res) => {
+          expect(res.body).toEqual([
+            {
+              id: '1',
+              username: 'johndoe',
+              email: 'john@example.com',
+              status: 'ACTIVE',
+            },
+          ]);
+        });
     });
-  }
+  });
 
-  @Get(':id')
-  @ApiOperation({ summary: 'Get user by ID' })
-  @ApiParam({ name: 'id', description: 'User ID', type: String })
-  @ApiResponse({ status: HttpStatus.OK, description: 'User found.' })
-  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'User not found.' })
-  findOne(@Param('id') id: string) {
-    return this.usersService.findOne({ id });
-  }
+  describe('/users/search (POST)', () => {
+    it('should search users matching criteria', () => {
+      const whereDto = { status: 'ACTIVE', username: 'johndoe' };
 
-  @Patch(':id')
-  @ApiOperation({ summary: 'Update a user by ID' })
-  @ApiParam({ name: 'id', description: 'User ID', type: String })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'User successfully updated.',
-  })
-  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'User not found.' })
-  update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
-    return this.usersService.update({
-      where: { id },
-      data: updateUserDto,
+      return request(app.getHttpServer())
+        .post('/users/search')
+        .query({
+          skip: 0,
+          take: 10,
+          cursorId: '1',
+          orderBy: 'createdAt',
+          order: 'desc',
+        })
+        .send(whereDto)
+        .expect(HttpStatus.OK)
+        .expect((res) => {
+          expect(res.body).toEqual([
+            {
+              id: '1',
+              username: 'johndoe',
+              email: 'john@example.com',
+              status: 'ACTIVE',
+            },
+          ]);
+        });
     });
-  }
+  });
 
-  @Delete(':id')
-  @ApiOperation({ summary: 'Delete a user by ID' })
-  @ApiParam({ name: 'id', description: 'User numeric ID', type: String })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'User successfully deleted.',
-  })
-  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'User not found.' })
-  remove(@Param('id') id: string) {
-    return this.usersService.remove({ id });
-  }
-}
+  describe('/users/:id (GET)', () => {
+    it('should retrieve a single user by ID', () => {
+      return request(app.getHttpServer())
+        .get('/users/1')
+        .expect(HttpStatus.OK)
+        .expect((res) => {
+          expect(res.body).toEqual({
+            id: '1',
+            username: 'johndoe',
+            email: 'john@example.com',
+            status: 'ACTIVE',
+          });
+        });
+    });
+  });
+
+  describe('/users/:id (PATCH)', () => {
+    it('should update a user by ID', () => {
+      const updateUserDto = { firstName: 'Jane' };
+
+      return request(app.getHttpServer())
+        .patch('/users/1')
+        .send(updateUserDto)
+        .expect(HttpStatus.OK)
+        .expect((res) => {
+          expect(res.body).toEqual({
+            id: '1',
+            username: 'johndoe',
+            email: 'john@example.com',
+            status: 'ACTIVE',
+            ...updateUserDto,
+          });
+        });
+    });
+  });
+
+  afterEach(async () => {
+    await app.close();
+  });
+});

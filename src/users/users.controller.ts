@@ -5,7 +5,6 @@ import {
   Body,
   Patch,
   Param,
-  Delete,
   Query,
   HttpStatus,
   HttpCode,
@@ -19,6 +18,7 @@ import {
   ApiBody,
 } from '@nestjs/swagger';
 import { UsersService } from './users.service';
+import { TransactionsService } from '../transactions/transactions.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { WhereUserDto } from './dto/where-user.dto';
@@ -40,7 +40,10 @@ const orderEnum = ['asc', 'desc'] as const;
 @ApiTags('users')
 @Controller('users')
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(
+    private readonly usersService: UsersService,
+    private readonly transactionsService: TransactionsService,
+  ) {}
 
   @Post()
   @ApiOperation({ summary: 'Create a new user' })
@@ -194,15 +197,64 @@ export class UsersController {
     });
   }
 
-  @Delete(':id')
-  @ApiOperation({ summary: 'Delete a user by ID' })
-  @ApiParam({ name: 'id', description: 'User numeric ID', type: String })
+  @Get(':id/transactions')
+  @ApiOperation({
+    summary: "Retrieve all user's transactions with optional pagination",
+  })
+  @ApiParam({
+    name: 'id',
+    required: true,
+  })
+  @ApiQuery({
+    name: 'skip',
+    required: false,
+    type: Number,
+    description: 'Number of records to skip',
+  })
+  @ApiQuery({
+    name: 'take',
+    required: false,
+    type: Number,
+    description: 'Number of records to take',
+  })
+  @ApiQuery({
+    name: 'cursorId',
+    required: false,
+    type: String,
+    description: 'User ID for cursor-based pagination',
+  })
+  @ApiQuery({
+    name: 'orderBy',
+    required: false,
+    type: 'string',
+    enum: orderByEnum,
+    description: 'Sorting key',
+  })
+  @ApiQuery({
+    name: 'order',
+    required: false,
+    type: 'string',
+    enum: orderEnum,
+    description: 'Sort',
+  })
   @ApiResponse({
     status: HttpStatus.OK,
-    description: 'User successfully deleted.',
+    description: 'Return users.',
   })
-  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'User not found.' })
-  remove(@Param('id') id: string) {
-    return this.usersService.remove({ id });
+  findAllTransactions(
+    @Param('id') id: string,
+    @Query('skip') skip?: number,
+    @Query('take') take?: number,
+    @Query('cursorId') cursorId?: string,
+    @Query('orderBy') orderBy?: (typeof orderByEnum)[number],
+    @Query('order') order?: (typeof orderEnum)[number],
+  ) {
+    return this.transactionsService.findAll({
+      skip: skip !== undefined ? +skip : undefined,
+      take: take !== undefined ? +take : undefined,
+      cursor: cursorId ? { id: cursorId } : undefined,
+      orderBy: orderBy ? { [orderBy]: order } : { createdAt: 'desc' },
+      where: { OR: [{ senderId: id }, { recipientId: id }] },
+    });
   }
 }

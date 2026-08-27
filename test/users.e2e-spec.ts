@@ -131,20 +131,6 @@ describe('UsersController (e2e)', () => {
     });
   });
 
-  describe('/users/:id (DELETE)', () => {
-    it('should delete a user by ID', () => {
-      return request(app.getHttpServer())
-        .delete('/users/1')
-        .expect(HttpStatus.OK)
-        .expect((res) => {
-          expect(res.body).toEqual({
-            id: '1',
-            username: 'johndoe',
-          });
-        });
-    });
-  });
-
   afterEach(async () => {
     await app.close();
   });
