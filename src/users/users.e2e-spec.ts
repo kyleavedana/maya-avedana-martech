@@ -8,7 +8,6 @@ import {
   Delete,
   Query,
   HttpStatus,
-  HttpCode,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -112,7 +111,6 @@ export class UsersController {
   }
 
   @Post('search')
-  @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Search users with optional pagination',
   })
