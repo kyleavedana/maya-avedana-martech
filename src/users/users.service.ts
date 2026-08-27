@@ -6,7 +6,7 @@ import { User, Prisma } from '../generated/prisma/client';
 export class UsersService {
   constructor(private prisma: PrismaService) {}
 
-  async create(data: Prisma.UserCreateInput): Promise<User> {
+  async create(data: Prisma.UserCreateInput): Promise<User | undefined> {
     const existingUser = await this.prisma.user.findFirst({
       where: {
         OR: [
@@ -28,9 +28,9 @@ export class UsersService {
       if (data.phoneNumber && existingUser.phoneNumber === data.phoneNumber) {
         throw new ConflictException('Phone number is already in use.');
       }
+    } else {
+      return await this.prisma.user.create({ data });
     }
-
-    return await this.prisma.user.create({ data });
   }
 
   async findAll(params: {
